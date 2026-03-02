@@ -175,20 +175,43 @@ KIMI_API='your-key' pytest tests/test_semantic_search.py -v
 - [Phase 3 Plan](docs/plans/2026-03-02-phase3-code-database.md) - Code database implementation
 - [Phase 3 Summary](docs/phase3-summary.md) - Implementation summary
 
-## Example: Optimizer Workflow
+## Example: Complete Optimizer Workflow
 
-```markdown
-# Optimizer Workflow
+CodeWeaver includes a complete optimizer workflow that demonstrates multi-agent coordination, user interaction, and validation.
 
-@analyzer: Analyze the slow_sort_project and identify performance issues
-@coder: Implement optimizations based on analyzer findings
-@validator: Run tests to verify optimizations work correctly
-```
+See [Optimizer Workflow Guide](docs/optimizer-workflow-guide.md) for detailed walkthrough.
 
-Run with:
+### Quick Start
+
 ```bash
+cd tests/fixtures/slow_sort_project
 codeweaver run optimizer.md
 ```
+
+The workflow will:
+1. Analyze project structure with @structure-agent
+2. Ask you to select entry file via @tool:select
+3. Ask which algorithm to optimize
+4. Identify specific function to optimize
+5. Run baseline and capture output
+6. Apply optimizations with @coder-agent
+7. Validate correctness and performance with @validator-agent
+8. Auto-fix any bugs detected
+
+### Expected Output
+
+```
+time=0.1234s result_hash=abc12345  # baseline
+time=0.0056s result_hash=abc12345  # optimized (22x faster, same output)
+```
+
+### Workflow Features
+
+- **Interactive Selection:** User chooses entry point, target file, and function
+- **Baseline Capture:** Automatic execution timing and output hashing
+- **Validation Loop:** Compares baseline vs optimized output for correctness
+- **Auto Bug-Fix:** If validation fails, coder-agent automatically attempts fixes
+- **Performance Metrics:** Reports speedup and verifies optimization goals met
 
 ## Contributing
 

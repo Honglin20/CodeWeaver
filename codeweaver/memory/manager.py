@@ -69,3 +69,43 @@ class MemoryManager:
     def read_workflow_state(self) -> str:
         path = self.root / "workflow.md"
         return path.read_text() if path.exists() else ""
+
+    def write_baseline_output(self, output: str, execution_time: float) -> None:
+        """Save baseline program output and metrics."""
+        content = f"""# Baseline Output
+
+**Execution Time:** {execution_time:.4f}s
+
+## Output
+```
+{output}
+```
+"""
+        path = self.root / "baseline_output.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+
+    def write_optimized_output(self, output: str, execution_time: float) -> None:
+        """Save optimized program output and metrics."""
+        content = f"""# Optimized Output
+
+**Execution Time:** {execution_time:.4f}s
+
+## Output
+```
+{output}
+```
+"""
+        path = self.root / "optimized_output.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+
+    def read_baseline_output(self) -> str:
+        """Read baseline output."""
+        path = self.root / "baseline_output.md"
+        return path.read_text() if path.exists() else ""
+
+    def read_optimized_output(self) -> str:
+        """Read optimized output."""
+        path = self.root / "optimized_output.md"
+        return path.read_text() if path.exists() else ""
