@@ -252,7 +252,7 @@ def run(workflow: str):
         console.print(f"[red]Workflow file not found: {workflow}[/red]")
         raise typer.Exit(1)
     wf = parse_workflow(wf_file.read_text())
-    executor = WorkflowExecutor(_cw_root())
+    executor = WorkflowExecutor(_cw_root(), llm_fn=_mock_llm_fn)
     tid = executor.run(wf)
     console.print(f"[green]Completed. thread_id: {tid}[/green]")
 
@@ -270,7 +270,7 @@ def resume(thread_id: str):
         console.print(f"[red]Workflow file not found: {wf_name}[/red]")
         raise typer.Exit(1)
     wf = parse_workflow(wf_file.read_text())
-    executor = WorkflowExecutor(_cw_root())
+    executor = WorkflowExecutor(_cw_root(), llm_fn=_mock_llm_fn)
     executor.resume(thread_id, wf)
     console.print(f"[green]Resumed and completed: {thread_id}[/green]")
 

@@ -35,7 +35,8 @@ def compile_graph(
         graph.add_node(node_name, node_fn)
 
     if plans:
-        graph.set_entry_point("step_0")
+        # Set entry point to first step's actual index
+        graph.set_entry_point(f"step_{plans[0].index}")
 
     for i, plan in enumerate(plans):
         node_name = f"step_{plan.index}"

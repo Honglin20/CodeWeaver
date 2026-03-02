@@ -28,19 +28,19 @@ class WorkflowExecutor:
         plans = orchestrator.analyze(workflow_def)
 
         graph = compile_graph(plans, registry, memory, self.llm_fn)
-        checkpointer = SqliteSaver.from_conn_string(self.checkpoints_db)
-        compiled = graph.compile(checkpointer=checkpointer)
+        with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
+            compiled = graph.compile(checkpointer=checkpointer)
 
-        initial_state = WorkflowState(
-            current_step=0,
-            iteration=0,
-            status="running",
-            memory_root=str(self.root / "memory"),
-            error_count=0,
-            task_description="",
-        )
-        config = {"configurable": {"thread_id": thread_id}}
-        compiled.invoke(initial_state, config=config)
+            initial_state = WorkflowState(
+                current_step=0,
+                iteration=0,
+                status="running",
+                memory_root=str(self.root / "memory"),
+                error_count=0,
+                task_description="",
+            )
+            config = {"configurable": {"thread_id": thread_id}}
+            compiled.invoke(initial_state, config=config)
 
         self._save_run(thread_id, workflow_def.name, "completed")
         return thread_id
@@ -61,11 +61,11 @@ class WorkflowExecutor:
         plans = orchestrator.analyze(workflow_def)
 
         graph = compile_graph(plans, registry, memory, self.llm_fn)
-        checkpointer = SqliteSaver.from_conn_string(self.checkpoints_db)
-        compiled = graph.compile(checkpointer=checkpointer)
+        with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
+            compiled = graph.compile(checkpointer=checkpointer)
 
-        config = {"configurable": {"thread_id": thread_id}}
-        compiled.invoke(None, config=config)
+            config = {"configurable": {"thread_id": thread_id}}
+            compiled.invoke(None, config=config)
 
         self._save_run(thread_id, workflow_def.name, "completed")
 
