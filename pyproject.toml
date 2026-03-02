@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codeweaver"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.3",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "litellm>=1.0",
+    "prompt_toolkit>=3.0",
+    "rich>=13.0",
+    "questionary>=2.0",
+    "python-frontmatter>=1.0",
+    "libcst>=1.0",
+    "jedi>=0.19",
+    "pyyaml>=6.0",
+    "debugpy>=1.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+codeweaver = "codeweaver.cli:main"
