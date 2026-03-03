@@ -63,6 +63,8 @@ class ToolExecutor:
                 return self._execute_list_files(**kwargs)
             elif tool_name == "tool_select":
                 return self._execute_tool_select(**kwargs)
+            elif tool_name == "build_code_tree":
+                return self._execute_build_code_tree(**kwargs)
             else:
                 logger.warning(f"Unknown tool requested: {tool_name}")
                 return ToolResult(
@@ -186,6 +188,50 @@ class ToolExecutor:
         except (ValueError, TypeError) as e:
             # Validation errors should return ToolResult
             logger.warning(f"tool_select validation failed: {e}")
+            return ToolResult(
+                success=False,
+                output=None,
+                error=str(e)
+            )
+
+    def _execute_build_code_tree(self, output_path: str | None = None) -> ToolResult:
+        """
+        Build hierarchical code tree of the project.
+
+        Args:
+            output_path: Optional path to save the tree (relative to project root)
+
+        Returns:
+            ToolResult with markdown tree representation
+        """
+        try:
+            from codeweaver.code_db.tree_builder import build_code_tree
+
+            # Build tree
+            markdown = build_code_tree(self.project_root)
+
+            # Save to file if requested
+            if output_path:
+                try:
+                    save_path = self._resolve_path(output_path)
+                    save_path.write_text(markdown, encoding='utf-8')
+                    logger.info(f"Code tree saved to: {save_path}")
+                except (ValueError, RuntimeError) as e:
+                    logger.warning(f"Failed to save code tree: {e}")
+                    return ToolResult(
+                        success=False,
+                        output=None,
+                        error=f"Failed to save tree: {str(e)}"
+                    )
+
+            logger.info("Code tree built successfully")
+            return ToolResult(
+                success=True,
+                output=markdown,
+                error=None
+            )
+        except Exception as e:
+            logger.error(f"Failed to build code tree: {e}", exc_info=True)
             return ToolResult(
                 success=False,
                 output=None,
@@ -386,6 +432,24 @@ class ToolExecutor:
                             }
                         },
                         "required": ["prompt", "options"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "build_code_tree",
+                    "description": "Build a hierarchical code tree showing project structure with classes, functions, and methods. More efficient than reading full files for large projects.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "output_path": {
+                                "type": "string",
+                                "description": "Optional path to save the tree markdown file (relative to project root)",
+                                "default": None
+                            }
+                        },
+                        "required": []
                     }
                 }
             }
