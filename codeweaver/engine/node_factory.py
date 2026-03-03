@@ -1,12 +1,14 @@
 from typing import Callable
 import json
 import logging
+from rich.console import Console
 from codeweaver.parser.agent import AgentDef
 from codeweaver.memory.manager import MemoryManager
 from codeweaver.tools.executor import ToolExecutor
 from codeweaver.engine.context_builder import ContextBuilder
 
 logger = logging.getLogger(__name__)
+console = Console()
 
 MAX_RETRIES = 3
 MAX_TOOL_ITERATIONS = 10
@@ -117,6 +119,11 @@ def make_node(
                 "tool_calls": tool_calls if isinstance(tool_calls, list) else [tool_calls]
             })
 
+            # Keep conversation history manageable to avoid token limits
+            # Keep system message + last 10 messages (5 exchanges)
+            if len(messages) > 11:
+                messages = [messages[0]] + messages[-10:]
+
             # Execute each tool and add results
             for tool_call in (tool_calls if isinstance(tool_calls, list) else [tool_calls]):
                 tool_call_id = tool_call.get("id", "unknown")
@@ -125,6 +132,10 @@ def make_node(
                 arguments_str = function_data.get("arguments", "{}")
 
                 logger.debug(f"Executing tool: {tool_name}")
+
+                # Display tool execution to user
+                args_preview = str(arguments_str)[:50] + "..." if len(str(arguments_str)) > 50 else str(arguments_str)
+                console.print(f"  [dim]→ Calling {tool_name}({args_preview})[/dim]")
 
                 # Validate tool is in agent's allowed tools list
                 if tool_name not in allowed_tools:

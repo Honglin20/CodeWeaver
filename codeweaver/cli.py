@@ -55,7 +55,9 @@ def create_llm_fn(messages: list[dict], tools: list[dict] | None = None):
         - If no tools: content string only
     """
     import os
+    import time
     import litellm
+    from litellm.exceptions import RateLimitError
 
     # Get API configuration from environment variables
     api_key = os.getenv("CODEWEAVER_API_KEY", "sk-IA0OXgtva7EmahBVdzkCJgcJxnmo4ja6O0M0M146HniteI3m")
@@ -63,30 +65,45 @@ def create_llm_fn(messages: list[dict], tools: list[dict] | None = None):
     model = os.getenv("CODEWEAVER_MODEL", "moonshot/moonshot-v1-8k")
     ssl_verify = os.getenv("CODEWEAVER_SSL_VERIFY", "true").lower() == "true"
 
-    try:
-        kwargs = {
-            "model": model,
-            "messages": messages,
-            "api_key": api_key,
-            "api_base": api_base,
-            "verify": ssl_verify,
-        }
-        if tools:
-            kwargs["tools"] = tools
-            kwargs["tool_choice"] = "auto"
+    # Retry configuration
+    max_retries = 3
+    base_delay = 2  # seconds
 
-        response = litellm.completion(**kwargs)
+    for attempt in range(max_retries):
+        try:
+            kwargs = {
+                "model": model,
+                "messages": messages,
+                "api_key": api_key,
+                "api_base": api_base,
+                "verify": ssl_verify,
+            }
+            if tools:
+                kwargs["tools"] = tools
+                kwargs["tool_choice"] = "auto"
 
-        # If tools were provided, return full message object for tool call processing
-        # Otherwise return just the content string for backward compatibility
-        if tools:
-            return response.choices[0].message
-        else:
-            return response.choices[0].message.content
-    except Exception as e:
-        console.print(f"[red]LLM API error: {e}[/red]")
-        console.print(f"[yellow]Tip: Set CODEWEAVER_API_KEY and CODEWEAVER_API_BASE environment variables[/yellow]")
-        raise
+            response = litellm.completion(**kwargs)
+
+            # If tools were provided, return full message object for tool call processing
+            # Otherwise return just the content string for backward compatibility
+            if tools:
+                return response.choices[0].message
+            else:
+                return response.choices[0].message.content
+
+        except RateLimitError as e:
+            if attempt < max_retries - 1:
+                # Exponential backoff: 2s, 4s, 8s
+                delay = base_delay * (2 ** attempt)
+                console.print(f"[yellow]Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})[/yellow]")
+                time.sleep(delay)
+            else:
+                console.print(f"[red]Rate limit error after {max_retries} attempts[/red]")
+                raise
+        except Exception as e:
+            console.print(f"[red]LLM API error: {e}[/red]")
+            console.print(f"[yellow]Tip: Set CODEWEAVER_API_KEY and CODEWEAVER_API_BASE environment variables[/yellow]")
+            raise
 
 
 def _run_analyze(wf_file: Path, auto: bool) -> None:
