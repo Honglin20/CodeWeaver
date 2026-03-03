@@ -121,12 +121,11 @@ def make_node(
 
             # Keep conversation history manageable to avoid token limits
             # Keep system message + user message + recent tool exchanges
-            # Each tool exchange is: assistant (with tool_calls) + N tool results
-            # We keep the last 2 complete exchanges (roughly 6-8 messages)
-            if len(messages) > 15:
+            # More aggressive truncation to stay well under 8K token limit
+            if len(messages) > 8:
                 # Always keep: system (0), user (1)
-                # Keep last 12 messages (should be ~2 complete tool exchanges)
-                messages = messages[:2] + messages[-12:]
+                # Keep last 5 messages (should be ~1 complete tool exchange)
+                messages = messages[:2] + messages[-5:]
 
             # Execute each tool and add results
             for tool_call in (tool_calls if isinstance(tool_calls, list) else [tool_calls]):
