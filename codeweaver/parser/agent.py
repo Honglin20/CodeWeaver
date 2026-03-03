@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import yaml
+from codeweaver.engine.tool_inference import infer_agent_tools
 
 
 @dataclass
@@ -21,11 +22,24 @@ def load_agent(path: str | Path) -> AgentDef:
         if not data.get(key):
             raise ValueError(f"Agent YAML missing required field: '{key}'")
     memory = data.get("memory", {})
+
+    # Get explicit tools or infer them
+    explicit_tools = data.get("tools", [])
+    if not explicit_tools:
+        # Infer tools from description and system prompt
+        inferred_tools = infer_agent_tools(
+            description=data["description"],
+            system_prompt=data["system_prompt"]
+        )
+        tools = inferred_tools
+    else:
+        tools = explicit_tools
+
     return AgentDef(
         name=data["name"],
         description=data["description"],
         system_prompt=data["system_prompt"],
-        tools=data.get("tools", []),
+        tools=tools,
         memory_read=memory.get("read", []),
         memory_write=memory.get("write", []),
         model=data.get("model"),

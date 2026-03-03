@@ -18,6 +18,7 @@ tools:
   - tool:select
   - read_file
   - list_files
+  - run_command
 memory:
   read:
     - agents/structure-agent/context.md
