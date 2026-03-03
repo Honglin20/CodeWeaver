@@ -67,13 +67,20 @@ def make_node(
         # Initialize tool executor if agent has tools
         tool_executor = None
         tool_schemas = None
+        allowed_tools = set(agent_def.tools) if agent_def.tools else set()
         if agent_def.tools:
             tool_executor = ToolExecutor(project_root)
-            tool_schemas = tool_executor.get_tool_schemas()
-            logger.info(f"Agent {agent_def.name} initialized with {len(tool_schemas)} tools")
+            # Filter tool schemas to only include allowed tools
+            all_schemas = tool_executor.get_tool_schemas()
+            tool_schemas = [
+                schema for schema in all_schemas
+                if schema["function"]["name"] in allowed_tools
+            ]
+            logger.info(f"Agent {agent_def.name} initialized with {len(tool_schemas)} tools: {allowed_tools}")
 
         # Tool execution loop
         response = None
+        executed_tools = []  # Track tools called for error reporting
         for iteration in range(MAX_TOOL_ITERATIONS):
             logger.debug(f"Tool iteration {iteration + 1}/{MAX_TOOL_ITERATIONS}")
 
@@ -140,6 +147,23 @@ def make_node(
 
                 logger.debug(f"Executing tool: {tool_name}")
 
+                # Validate tool is in agent's allowed tools list
+                if tool_name not in allowed_tools:
+                    logger.warning(f"Agent {agent_def.name} attempted to call unauthorized tool: {tool_name}")
+                    result_content = json.dumps({
+                        "success": False,
+                        "error": f"Tool '{tool_name}' is not in the allowed tools list for this agent"
+                    })
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": result_content
+                    })
+                    continue
+
+                # Track executed tool for error reporting
+                executed_tools.append(tool_name)
+
                 try:
                     # Parse arguments
                     arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else arguments_str
@@ -147,17 +171,31 @@ def make_node(
                     # Execute tool
                     result = tool_executor.execute(tool_name, **arguments)
 
-                    # Format result for LLM
-                    if result.success:
-                        result_content = json.dumps({
-                            "success": True,
-                            "output": result.output
-                        })
-                    else:
-                        result_content = json.dumps({
-                            "success": False,
-                            "error": result.error
-                        })
+                    # Format result for LLM with safe JSON serialization
+                    try:
+                        if result.success:
+                            result_content = json.dumps({
+                                "success": True,
+                                "output": result.output
+                            })
+                        else:
+                            result_content = json.dumps({
+                                "success": False,
+                                "error": result.error
+                            })
+                    except (TypeError, ValueError) as e:
+                        # Handle non-serializable objects
+                        logger.warning(f"Tool result not JSON serializable, converting to string: {e}")
+                        if result.success:
+                            result_content = json.dumps({
+                                "success": True,
+                                "output": str(result.output)
+                            })
+                        else:
+                            result_content = json.dumps({
+                                "success": False,
+                                "error": str(result.error)
+                            })
 
                     logger.debug(f"Tool {tool_name} executed: success={result.success}")
 
@@ -182,12 +220,17 @@ def make_node(
                 })
 
         # If we hit max iterations, use last response
-        logger.warning(f"Reached MAX_TOOL_ITERATIONS ({MAX_TOOL_ITERATIONS})")
-        final_content = "Maximum tool iterations reached"
+        logger.warning(
+            f"Reached MAX_TOOL_ITERATIONS ({MAX_TOOL_ITERATIONS}). "
+            f"Tools called: {executed_tools}"
+        )
+        final_content = f"Maximum tool iterations reached. Tools executed: {', '.join(executed_tools)}"
         if isinstance(response, dict):
-            final_content = response.get("content", final_content)
-        elif hasattr(response, "content"):
-            final_content = response.content or final_content
+            content = response.get("content")
+            if content:
+                final_content = f"{content}\n\n{final_content}"
+        elif hasattr(response, "content") and response.content:
+            final_content = f"{response.content}\n\n{final_content}"
 
         memory.write_agent_context(agent_def.name, final_content)
         return {**state, "status": "running", "current_step": state["current_step"]}

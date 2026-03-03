@@ -33,7 +33,7 @@ def _mock_memory():
     return m
 
 
-def test_agent_with_tools_receives_tool_schemas():
+def test_agent_with_tools_receives_tool_schemas(tmp_path):
     """Test that agents with tools receive tool schemas in LLM call."""
     memory = _mock_memory()
     agent = _agent_with_tools(tools=["read_file"])
@@ -48,7 +48,7 @@ def test_agent_with_tools_receives_tool_schemas():
         memory,
         total_steps=1,
         llm_fn=capture_llm,
-        project_root="/tmp/test_project"
+        project_root=str(tmp_path)
     )
 
     state = {
@@ -56,7 +56,7 @@ def test_agent_with_tools_receives_tool_schemas():
         "task_description": "Read a file",
         "status": "running",
         "iteration": 0,
-        "memory_root": "/tmp",
+        "memory_root": str(tmp_path),
         "error_count": 0
     }
 
@@ -140,7 +140,7 @@ def test_agent_executes_tool_when_llm_requests_it(tmp_path):
     assert "Hello from file" in final_response
 
 
-def test_agent_handles_multiple_tool_calls():
+def test_agent_handles_multiple_tool_calls(tmp_path):
     """Test that agent can handle multiple tool calls in sequence."""
     memory = _mock_memory()
     agent = _agent_with_tools(tools=["read_file", "run_command"])
@@ -191,7 +191,7 @@ def test_agent_handles_multiple_tool_calls():
         memory,
         total_steps=1,
         llm_fn=mock_llm,
-        project_root="/tmp/test"
+        project_root=str(tmp_path)
     )
 
     state = {
@@ -199,7 +199,7 @@ def test_agent_handles_multiple_tool_calls():
         "task_description": "Execute multiple tools",
         "status": "running",
         "iteration": 0,
-        "memory_root": "/tmp",
+        "memory_root": str(tmp_path),
         "error_count": 0
     }
 
@@ -209,7 +209,7 @@ def test_agent_handles_multiple_tool_calls():
     assert call_count[0] == 3
 
 
-def test_agent_respects_max_tool_iterations():
+def test_agent_respects_max_tool_iterations(tmp_path):
     """Test that agent stops after MAX_TOOL_ITERATIONS to prevent infinite loops."""
     memory = _mock_memory()
     agent = _agent_with_tools(tools=["read_file"])
@@ -239,7 +239,7 @@ def test_agent_respects_max_tool_iterations():
         memory,
         total_steps=1,
         llm_fn=mock_llm,
-        project_root="/tmp/test"
+        project_root=str(tmp_path)
     )
 
     state = {
@@ -247,7 +247,7 @@ def test_agent_respects_max_tool_iterations():
         "task_description": "Test max iterations",
         "status": "running",
         "iteration": 0,
-        "memory_root": "/tmp",
+        "memory_root": str(tmp_path),
         "error_count": 0
     }
 
@@ -257,7 +257,7 @@ def test_agent_respects_max_tool_iterations():
     assert call_count[0] == 5
 
 
-def test_agent_without_tools_works_normally():
+def test_agent_without_tools_works_normally(tmp_path):
     """Test that agents without tools continue to work as before."""
     memory = _mock_memory()
     agent = AgentDef(
@@ -277,7 +277,7 @@ def test_agent_without_tools_works_normally():
         memory,
         total_steps=1,
         llm_fn=capture_llm,
-        project_root="/tmp/test"
+        project_root=str(tmp_path)
     )
 
     state = {
@@ -285,7 +285,7 @@ def test_agent_without_tools_works_normally():
         "task_description": "Simple task",
         "status": "running",
         "iteration": 0,
-        "memory_root": "/tmp",
+        "memory_root": str(tmp_path),
         "error_count": 0
     }
 
@@ -296,7 +296,7 @@ def test_agent_without_tools_works_normally():
     assert captured_calls[0]["tools"] is None or len(captured_calls[0]["tools"]) == 0
 
 
-def test_agent_handles_tool_execution_errors():
+def test_agent_handles_tool_execution_errors(tmp_path):
     """Test that agent handles tool execution errors gracefully."""
     memory = _mock_memory()
     agent = _agent_with_tools(tools=["read_file"])
@@ -335,7 +335,7 @@ def test_agent_handles_tool_execution_errors():
         memory,
         total_steps=1,
         llm_fn=mock_llm,
-        project_root="/tmp/test"
+        project_root=str(tmp_path)
     )
 
     state = {
@@ -343,7 +343,7 @@ def test_agent_handles_tool_execution_errors():
         "task_description": "Read non-existent file",
         "status": "running",
         "iteration": 0,
-        "memory_root": "/tmp",
+        "memory_root": str(tmp_path),
         "error_count": 0
     }
 
@@ -353,7 +353,7 @@ def test_agent_handles_tool_execution_errors():
     assert call_count[0] == 2
 
 
-def test_agent_with_string_response_from_llm():
+def test_agent_with_string_response_from_llm(tmp_path):
     """Test backward compatibility when LLM returns string instead of dict."""
     memory = _mock_memory()
     agent = _agent_with_tools(tools=["read_file"])
@@ -367,7 +367,7 @@ def test_agent_with_string_response_from_llm():
         memory,
         total_steps=1,
         llm_fn=mock_llm,
-        project_root="/tmp/test"
+        project_root=str(tmp_path)
     )
 
     state = {
@@ -375,7 +375,7 @@ def test_agent_with_string_response_from_llm():
         "task_description": "Simple task",
         "status": "running",
         "iteration": 0,
-        "memory_root": "/tmp",
+        "memory_root": str(tmp_path),
         "error_count": 0
     }
 
@@ -384,3 +384,121 @@ def test_agent_with_string_response_from_llm():
     # Should work normally
     assert result["status"] == "running"
     memory.write_agent_context.assert_called_once_with("test_agent", "Task completed without tools")
+
+
+def test_agent_validates_tool_authorization(tmp_path):
+    """Test that agent rejects unauthorized tool calls."""
+    memory = _mock_memory()
+    # Agent only has read_file, not run_command
+    agent = _agent_with_tools(tools=["read_file"])
+
+    call_count = [0]
+
+    def mock_llm(messages, tools=None, **kwargs):
+        call_count[0] += 1
+
+        if call_count[0] == 1:
+            # Try to call unauthorized tool
+            return {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "run_command",  # Not in allowed tools
+                            "arguments": json.dumps({"cmd": "echo test", "cwd": "."})
+                        }
+                    }
+                ]
+            }
+        else:
+            # LLM should receive error about unauthorized tool
+            tool_messages = [m for m in messages if m.get("role") == "tool"]
+            assert len(tool_messages) == 1
+            assert "not in the allowed tools list" in tool_messages[0]["content"]
+            return "I cannot execute that command"
+
+    node = make_node(
+        agent,
+        memory,
+        total_steps=1,
+        llm_fn=mock_llm,
+        project_root=str(tmp_path)
+    )
+
+    state = {
+        "current_step": 0,
+        "task_description": "Test tool authorization",
+        "status": "running",
+        "iteration": 0,
+        "memory_root": str(tmp_path),
+        "error_count": 0
+    }
+
+    node(state)
+
+    # Should complete with error message
+    assert call_count[0] == 2
+
+
+def test_agent_handles_non_serializable_tool_results(tmp_path):
+    """Test that agent handles non-JSON-serializable tool results."""
+    memory = _mock_memory()
+    agent = _agent_with_tools(tools=["read_file"])
+
+    # Create a test file
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test content")
+
+    call_count = [0]
+
+    def mock_llm(messages, tools=None, **kwargs):
+        call_count[0] += 1
+
+        if call_count[0] == 1:
+            return {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "read_file",
+                            "arguments": json.dumps({"path": "test.txt"})
+                        }
+                    }
+                ]
+            }
+        else:
+            # Should receive tool result even if it had serialization issues
+            tool_messages = [m for m in messages if m.get("role") == "tool"]
+            assert len(tool_messages) == 1
+            # Content should be valid JSON
+            content = json.loads(tool_messages[0]["content"])
+            assert "success" in content
+            return "Task completed"
+
+    node = make_node(
+        agent,
+        memory,
+        total_steps=1,
+        llm_fn=mock_llm,
+        project_root=str(tmp_path)
+    )
+
+    state = {
+        "current_step": 0,
+        "task_description": "Test serialization",
+        "status": "running",
+        "iteration": 0,
+        "memory_root": str(tmp_path),
+        "error_count": 0
+    }
+
+    node(state)
+
+    assert call_count[0] == 2
+

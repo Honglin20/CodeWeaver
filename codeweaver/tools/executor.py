@@ -72,7 +72,12 @@ class ToolExecutor:
             )
 
     def _execute_run_command(self, cmd: str, cwd: str, timeout: int = 60) -> ToolResult:
-        """Execute run_command with cwd validation."""
+        """Execute run_command with cwd validation.
+
+        Security Note: This function logs all command executions for audit trail.
+        While we cannot fully prevent command injection (LLM controls commands),
+        all commands are logged with timestamp and context for security review.
+        """
         # Resolve and validate cwd path
         try:
             cwd_path = self._resolve_path(cwd)
@@ -85,10 +90,15 @@ class ToolExecutor:
             )
 
         # Log command execution for security auditing
-        logger.info(f"Executing command: {cmd} in {self._get_relative_path(cwd_path)}")
+        # SECURITY: All commands are logged for audit trail
+        logger.info(
+            f"[SECURITY AUDIT] Executing command: {cmd!r} "
+            f"in {self._get_relative_path(cwd_path)}"
+        )
 
         try:
             output = run_command(cmd=cmd, cwd=str(cwd_path), timeout=timeout)
+            logger.info(f"[SECURITY AUDIT] Command completed successfully: {cmd!r}")
             return ToolResult(success=True, output=output, error=None)
         except subprocess.TimeoutExpired as e:
             logger.warning(f"Command timeout: {cmd}")
