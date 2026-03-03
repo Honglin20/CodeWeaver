@@ -59,6 +59,11 @@ def create_llm_fn(messages: list[dict], tools: list[dict] | None = None):
     import litellm
     from litellm.exceptions import RateLimitError
 
+    # Suppress LiteLLM debug output
+    litellm.suppress_debug_info = True
+    import logging
+    logging.getLogger("LiteLLM").setLevel(logging.ERROR)
+
     # Get API configuration from environment variables
     api_key = os.getenv("CODEWEAVER_API_KEY", "sk-IA0OXgtva7EmahBVdzkCJgcJxnmo4ja6O0M0M146HniteI3m")
     api_base = os.getenv("CODEWEAVER_API_BASE", "https://api.moonshot.cn/v1")
@@ -101,8 +106,16 @@ def create_llm_fn(messages: list[dict], tools: list[dict] | None = None):
                 console.print(f"[red]Rate limit error after {max_retries} attempts[/red]")
                 raise
         except Exception as e:
-            console.print(f"[red]LLM API error: {e}[/red]")
-            console.print(f"[yellow]Tip: Set CODEWEAVER_API_KEY and CODEWEAVER_API_BASE environment variables[/yellow]")
+            # Show user-friendly error message
+            error_msg = str(e)
+            if "api_key" in error_msg.lower():
+                console.print(f"[red]API key error:[/red] Please set CODEWEAVER_API_KEY environment variable")
+            elif "connection" in error_msg.lower():
+                console.print(f"[red]Connection error:[/red] Cannot reach API endpoint. Check CODEWEAVER_API_BASE")
+            elif "timeout" in error_msg.lower():
+                console.print(f"[red]Timeout error:[/red] API request took too long")
+            else:
+                console.print(f"[red]LLM error:[/red] {error_msg}")
             raise
 
 
