@@ -2,11 +2,17 @@ from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
 import yaml
+from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from langgraph.checkpoint.sqlite import SqliteSaver
 from codeweaver.engine.compiler import compile_graph, WorkflowState
 from codeweaver.engine.orchestrator import Orchestrator
 from codeweaver.parser.agent import load_agent_registry
 from codeweaver.memory.manager import MemoryManager
+
+console = Console()
 
 
 class WorkflowExecutor:
@@ -20,12 +26,19 @@ class WorkflowExecutor:
         """Start a new workflow run. Returns thread_id."""
         thread_id = thread_id or str(uuid4())
 
+        console.print(f"\n[bold cyan]Starting workflow:[/bold cyan] {workflow_def.name}")
+        console.print(f"[dim]Thread ID: {thread_id}[/dim]\n")
+
         agents_dir = self.root / "agents"
         registry = load_agent_registry(agents_dir) if agents_dir.exists() else {}
 
         memory = MemoryManager(self.root / "memory")
+
+        console.print("[yellow]Analyzing workflow and generating execution plan...[/yellow]")
         orchestrator = Orchestrator(registry, memory, self.llm_fn)
         plans = orchestrator.analyze(workflow_def)
+
+        console.print(f"[green]✓[/green] Generated {len(plans)} execution steps\n")
 
         # Determine project root (parent of .codeweaver directory)
         project_root = str(self.root.parent)
@@ -35,6 +48,9 @@ class WorkflowExecutor:
             workflow_steps=workflow_def.steps,
             project_root=project_root
         )
+
+        console.print("[bold]Executing workflow...[/bold]\n")
+
         with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
             compiled = graph.compile(checkpointer=checkpointer)
 
@@ -47,8 +63,15 @@ class WorkflowExecutor:
                 task_description="",
             )
             config = {"configurable": {"thread_id": thread_id}}
+
+            # Execute with progress tracking
+            for i, plan in enumerate(plans, 1):
+                console.print(f"[cyan]Step {i}/{len(plans)}:[/cyan] {plan.goal}")
+                console.print(f"[dim]  Agent: {plan.agent_name}[/dim]")
+
             compiled.invoke(initial_state, config=config)
 
+        console.print(f"\n[bold green]✓ Workflow completed successfully[/bold green]")
         self._save_run(thread_id, workflow_def.name, "completed")
         return thread_id
 

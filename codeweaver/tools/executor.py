@@ -2,9 +2,12 @@ import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
+
+from langgraph.types import Command
 
 from codeweaver.tools.filesystem import run_command, read_file, list_files
+from codeweaver.tools.interactive import InteractiveToolHandler
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +38,20 @@ class ToolExecutor:
                          All tool operations are restricted to this directory.
         """
         self.project_root = Path(project_root).resolve()
+        self.interactive_handler = InteractiveToolHandler()
         logger.info(f"ToolExecutor initialized with project root: {self.project_root}")
 
-    def execute(self, tool_name: str, **kwargs) -> ToolResult:
+    def execute(self, tool_name: str, **kwargs) -> Union[ToolResult, Command]:
         """
         Execute a tool with the given arguments.
 
         Args:
-            tool_name: Name of the tool to execute (run_command, read_file, list_files)
+            tool_name: Name of the tool to execute (run_command, read_file, list_files, tool_select)
             **kwargs: Tool-specific arguments
 
         Returns:
             ToolResult with success status, output, and error information
+            OR Command for interactive tools that trigger interrupts
         """
         logger.info(f"Executing tool: {tool_name}")
         try:
@@ -56,6 +61,8 @@ class ToolExecutor:
                 return self._execute_read_file(**kwargs)
             elif tool_name == "list_files":
                 return self._execute_list_files(**kwargs)
+            elif tool_name == "tool_select":
+                return self._execute_tool_select(**kwargs)
             else:
                 logger.warning(f"Unknown tool requested: {tool_name}")
                 return ToolResult(
@@ -158,6 +165,32 @@ class ToolExecutor:
         except Exception as e:
             logger.error(f"Failed to list files in: {directory}", exc_info=True)
             return ToolResult(success=False, output=None, error=str(e))
+
+    def _execute_tool_select(self, prompt: str, options: list[str]) -> Union[ToolResult, Command]:
+        """
+        Execute tool_select to create an interactive prompt.
+
+        Args:
+            prompt: The question or prompt to show the user
+            options: List of options to choose from
+
+        Returns:
+            Command with interrupt data if validation passes,
+            ToolResult with error if validation fails
+        """
+        try:
+            # Use interactive handler to create the Command
+            command = self.interactive_handler.handle_select(prompt=prompt, options=options)
+            logger.info(f"Created interactive select prompt: {prompt}")
+            return command
+        except (ValueError, TypeError) as e:
+            # Validation errors should return ToolResult
+            logger.warning(f"tool_select validation failed: {e}")
+            return ToolResult(
+                success=False,
+                output=None,
+                error=str(e)
+            )
 
     def _resolve_path(self, path: str) -> Path:
         """
@@ -328,6 +361,31 @@ class ToolExecutor:
                             }
                         },
                         "required": ["directory"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "tool_select",
+                    "description": "Present a list of choices to the user and wait for their selection. Pauses workflow execution until user responds.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "string",
+                                "description": "The question or prompt to show the user"
+                            },
+                            "options": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "minItems": 2,
+                                "description": "List of options for the user to choose from (minimum 2 required)"
+                            }
+                        },
+                        "required": ["prompt", "options"]
                     }
                 }
             }
