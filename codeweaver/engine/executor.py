@@ -40,6 +40,13 @@ class WorkflowExecutor:
 
         console.print(f"[green]✓[/green] Generated {len(plans)} execution steps\n")
 
+        # Display workflow overview
+        console.print("[bold]Workflow Overview:[/bold]")
+        for i, plan in enumerate(plans, 1):
+            agents_str = f" [{', '.join(plan.agents)}]" if plan.agents else ""
+            console.print(f"  {i}. {plan.goal}{agents_str}")
+        console.print()
+
         # Determine project root (parent of .codeweaver directory)
         project_root = str(self.root.parent)
 
