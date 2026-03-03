@@ -192,3 +192,92 @@ def test_tool_result_dataclass_structure():
     assert result.success is False
     assert result.output is None
     assert result.error == "error message"
+
+
+def test_symlink_detection_in_read_file(executor, project_root, tmp_path):
+    """Test that read_file detects and rejects symlinks."""
+    # Create a file outside project root
+    outside_file = tmp_path.parent / "outside.txt"
+    outside_file.write_text("secret data")
+
+    # Create a symlink inside project root pointing to outside file
+    symlink_path = project_root / "link.txt"
+    symlink_path.symlink_to(outside_file)
+
+    result = executor.execute("read_file", path="link.txt")
+
+    assert result.success is False
+    assert "symlink" in result.error.lower()
+
+
+def test_symlink_detection_in_list_files(executor, project_root, tmp_path):
+    """Test that list_files detects and rejects symlinks."""
+    # Create a directory outside project root
+    outside_dir = tmp_path.parent / "outside_dir"
+    outside_dir.mkdir(exist_ok=True)
+
+    # Create a symlink inside project root pointing to outside directory
+    symlink_path = project_root / "link_dir"
+    symlink_path.symlink_to(outside_dir)
+
+    result = executor.execute("list_files", directory="link_dir", pattern="*")
+
+    assert result.success is False
+    assert "symlink" in result.error.lower()
+
+
+def test_symlink_detection_in_run_command(executor, project_root, tmp_path):
+    """Test that run_command detects and rejects symlinks."""
+    # Create a directory outside project root
+    outside_dir = tmp_path.parent / "outside_dir"
+    outside_dir.mkdir(exist_ok=True)
+
+    # Create a symlink inside project root pointing to outside directory
+    symlink_path = project_root / "link_dir"
+    symlink_path.symlink_to(outside_dir)
+
+    result = executor.execute("run_command", cmd="echo test", cwd="link_dir")
+
+    assert result.success is False
+    assert "symlink" in result.error.lower()
+
+
+def test_error_message_sanitization(executor, project_root):
+    """Test that error messages don't expose full system paths."""
+    # Try to access a path outside project root
+    result = executor.execute("read_file", path="../../etc/passwd")
+
+    assert result.success is False
+    # Error message should not contain the full resolved path
+    assert str(project_root) not in result.error
+    # Should contain sanitized path or relative path
+    assert "outside project root" in result.error.lower()
+
+
+def test_absolute_path_handling_in_run_command(executor, project_root):
+    """Test that run_command handles absolute paths correctly."""
+    # Test with absolute path inside project
+    abs_path = project_root / "src"
+    result = executor.execute("run_command", cmd="echo test", cwd=str(abs_path))
+
+    assert result.success is True
+
+    # Test with absolute path outside project
+    outside_path = project_root.parent / "outside"
+    outside_path.mkdir(exist_ok=True)
+    result = executor.execute("run_command", cmd="echo test", cwd=str(outside_path))
+
+    assert result.success is False
+    assert "outside project root" in result.error.lower()
+
+
+def test_relative_path_in_error_messages(executor, project_root):
+    """Test that error messages show relative paths from project root."""
+    # Try to read a non-existent file
+    result = executor.execute("read_file", path="src/nonexistent.py")
+
+    assert result.success is False
+    # Should show relative path, not absolute
+    assert "src/nonexistent.py" in result.error or "nonexistent.py" in result.error
+    assert str(project_root) not in result.error
+
