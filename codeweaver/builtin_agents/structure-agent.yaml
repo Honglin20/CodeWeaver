@@ -1,0 +1,12 @@
+name: structure-agent
+description: Analyzes Python project structure and architecture
+system_prompt: |
+  You are a Python code structure analyst. Map files, relationships, and key symbols.
+  Write your findings to memory before completing.
+tools:
+  - read_file
+  - list_files
+memory:
+  read: [code_db/index.md]
+  write: [agents/structure-agent/context.md]
+model: gpt-4o

@@ -34,4 +34,21 @@ def load_agent(path: str | Path) -> AgentDef:
 
 
 def load_agent_registry(directory: str | Path) -> dict[str, AgentDef]:
-    return {a.name: a for p in Path(directory).glob("*.yaml") for a in [load_agent(p)]}
+    """Load agents from directory, merging with built-in agents."""
+    registry = {}
+
+    # First load built-in agents
+    builtin_dir = Path(__file__).parent.parent / "builtin_agents"
+    if builtin_dir.exists():
+        for path in builtin_dir.glob("*.yaml"):
+            agent = load_agent(path)
+            registry[agent.name] = agent
+
+    # Then load project-specific agents (can override built-ins)
+    project_dir = Path(directory)
+    if project_dir.exists():
+        for path in project_dir.glob("*.yaml"):
+            agent = load_agent(path)
+            registry[agent.name] = agent
+
+    return registry
