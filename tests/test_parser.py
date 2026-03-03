@@ -60,7 +60,8 @@ def test_load_agent_yaml():
 def test_missing_optional_fields_use_defaults():
     agent = load_agent(FIXTURES_AGENTS / "minimal-agent.yaml")
     assert agent.model is None
-    assert agent.tools == []
+    # Tools are now inferred automatically if not specified
+    assert isinstance(agent.tools, list)
     assert agent.max_tokens == 4096
 
 def test_invalid_yaml_raises_error(tmp_path):

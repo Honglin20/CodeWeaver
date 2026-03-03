@@ -132,7 +132,7 @@ def test_get_tool_schemas_returns_openai_format(executor):
     schemas = executor.get_tool_schemas()
 
     assert isinstance(schemas, list)
-    assert len(schemas) == 3  # run_command, read_file, list_files
+    assert len(schemas) == 5  # run_command, read_file, list_files, tool_select, build_code_tree
 
     for schema in schemas:
         assert schema["type"] == "function"
