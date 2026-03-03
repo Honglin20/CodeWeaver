@@ -4,6 +4,7 @@ import logging
 from codeweaver.parser.agent import AgentDef
 from codeweaver.memory.manager import MemoryManager
 from codeweaver.tools.executor import ToolExecutor
+from codeweaver.engine.context_builder import ContextBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -36,33 +37,11 @@ def make_node(
     """
 
     def node(state: dict) -> dict:
-        bundle = memory.load_agent_memory_bundle(
-            agent_def.name, state["current_step"], total_steps
+        # Build context using ContextBuilder
+        context_builder = ContextBuilder()
+        messages = context_builder.build_messages(
+            agent_def, memory, state, total_steps, step_goal, step_raw_text
         )
-
-        # Build structured context with step information
-        context_parts = []
-        # Include step context if either goal or raw_text is provided
-        if step_goal or step_raw_text:
-            context_parts.append("# Current Step Context")
-            if step_goal:
-                context_parts.append(f"**Goal:** {step_goal}")
-            if step_raw_text:
-                context_parts.append(f"**Instructions:**\n{step_raw_text}")
-            context_parts.append("")
-
-        context_parts.append("# Memory Context")
-        context_parts.append(bundle)
-
-        if state.get("task_description"):
-            context_parts.append(f"\n\nTask: {state['task_description']}")
-
-        user_content = "\n".join(context_parts)
-
-        messages = [
-            {"role": "system", "content": agent_def.system_prompt},
-            {"role": "user", "content": user_content},
-        ]
 
         # Initialize tool executor if agent has tools
         tool_executor = None
