@@ -47,8 +47,13 @@ def _find_workflow_file(name: str) -> Path | None:
     return None
 
 
-def create_llm_fn(messages: list[dict], tools: list[dict] | None = None) -> str:
-    """Real LLM function using litellm with configurable API."""
+def create_llm_fn(messages: list[dict], tools: list[dict] | None = None):
+    """Real LLM function using litellm with configurable API.
+
+    Returns:
+        - If tools provided: full message object with potential tool_calls
+        - If no tools: content string only
+    """
     import os
     import litellm
 
@@ -71,7 +76,13 @@ def create_llm_fn(messages: list[dict], tools: list[dict] | None = None) -> str:
             kwargs["tool_choice"] = "auto"
 
         response = litellm.completion(**kwargs)
-        return response.choices[0].message.content
+
+        # If tools were provided, return full message object for tool call processing
+        # Otherwise return just the content string for backward compatibility
+        if tools:
+            return response.choices[0].message
+        else:
+            return response.choices[0].message.content
     except Exception as e:
         console.print(f"[red]LLM API error: {e}[/red]")
         console.print(f"[yellow]Tip: Set CODEWEAVER_API_KEY and CODEWEAVER_API_BASE environment variables[/yellow]")

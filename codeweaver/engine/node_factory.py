@@ -9,7 +9,7 @@ from codeweaver.engine.context_builder import ContextBuilder
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
-MAX_TOOL_ITERATIONS = 5
+MAX_TOOL_ITERATIONS = 10
 
 
 def make_node(

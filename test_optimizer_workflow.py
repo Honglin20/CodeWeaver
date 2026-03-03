@@ -18,7 +18,7 @@ from codeweaver.parser.workflow import parse_workflow
 os.environ["CODEWEAVER_API_KEY"] = "sk-IA0OXgtva7EmahBVdzkCJgcJxnmo4ja6O0M0M146HniteI3m"
 os.environ["CODEWEAVER_API_BASE"] = "https://api.moonshot.cn/v1"
 
-def create_llm_fn(messages: list[dict], tools: list[dict] | None = None) -> str:
+def create_llm_fn(messages: list[dict], tools: list[dict] | None = None):
     """LLM function for testing."""
     import litellm
 
@@ -37,7 +37,12 @@ def create_llm_fn(messages: list[dict], tools: list[dict] | None = None) -> str:
         kwargs["tool_choice"] = "auto"
 
     response = litellm.completion(**kwargs)
-    return response.choices[0].message.content
+
+    # Return full message if tools provided, otherwise just content
+    if tools:
+        return response.choices[0].message
+    else:
+        return response.choices[0].message.content
 
 def main():
     # Load workflow
