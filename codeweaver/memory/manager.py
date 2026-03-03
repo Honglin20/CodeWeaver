@@ -56,15 +56,42 @@ class MemoryManager:
             f.write(f"\n## {ts}\n\n{summary}\n")
 
     def load_agent_memory_bundle(self, agent_name: str, current_step: int, total_steps: int) -> str:
+        """Load memory bundle for agent, with size limits to prevent token overflow."""
         parts = []
-        parts.append(self.read_agent_context(agent_name))
+
+        # Load agent's own context (most important)
+        context = self.read_agent_context(agent_name)
+        parts.append(context)
+
+        # Load agent's history (limit to last 1000 chars to prevent overflow)
         history = self.root / "agents" / agent_name / "history.md"
-        parts.append(history.read_text() if history.exists() else "")
+        if history.exists():
+            history_text = history.read_text()
+            if len(history_text) > 1000:
+                history_text = "...(truncated)\n" + history_text[-1000:]
+            parts.append(history_text)
+
+        # Load current step (full)
         parts.append(self.read_step(current_step, full=True))
-        for n in range(total_steps):
+
+        # Load other steps (metadata only, limit to 3 most recent)
+        other_steps = []
+        for n in range(max(0, current_step - 3), current_step):
             if n != current_step:
-                parts.append(self.read_step(n, full=False))
-        return "\n".join(parts)
+                step_meta = self.read_step(n, full=False)
+                if step_meta:
+                    other_steps.append(step_meta)
+
+        if other_steps:
+            parts.extend(other_steps)
+
+        # Join and limit total size to ~4000 chars (~1000 tokens)
+        bundle = "\n".join(parts)
+        if len(bundle) > 4000:
+            # Keep first 2000 and last 2000 chars
+            bundle = bundle[:2000] + "\n\n...(truncated)...\n\n" + bundle[-2000:]
+
+        return bundle
 
     def write_workflow_state(self, content: str) -> None:
         path = self.root / "workflow.md"
