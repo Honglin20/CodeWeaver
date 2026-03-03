@@ -253,8 +253,8 @@ def test_agent_respects_max_tool_iterations(tmp_path):
 
     node(state)
 
-    # Should stop at MAX_TOOL_ITERATIONS (5)
-    assert call_count[0] == 5
+    # Should stop at MAX_TOOL_ITERATIONS (10)
+    assert call_count[0] == 10
 
 
 def test_agent_without_tools_works_normally(tmp_path):
