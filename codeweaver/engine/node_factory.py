@@ -22,6 +22,9 @@ def make_node(
     step_goal: str = "",
     step_raw_text: str = "",
     project_root: str = ".",
+    display=None,  # Add display parameter
+    step_index: int = 0,  # Add step index
+    step_agents: list[str] = None,  # Add agents list
 ) -> Callable:
     """Returns a LangGraph node function for the given agent.
 
@@ -33,12 +36,19 @@ def make_node(
         step_goal: High-level goal for the current step (from orchestrator)
         step_raw_text: Raw markdown text from workflow definition (user instructions)
         project_root: Root directory for tool execution sandboxing
+        display: Optional display manager for progress feedback
+        step_index: Index of the current step (0-based)
+        step_agents: List of agent names involved in this step
 
     Returns:
         A callable node function compatible with LangGraph
     """
 
     def node(state: dict) -> dict:
+        # Show step start
+        if display:
+            display.start_step(step_index, step_goal, step_agents or [agent_def.name])
+
         # Build context using ContextBuilder
         context_builder = ContextBuilder()
         messages = context_builder.build_messages(
@@ -106,6 +116,16 @@ def make_node(
             if not tool_calls:
                 logger.debug("No tool calls in response, completing")
                 final_content = content if content else str(response)
+
+                # Extract summary from LLM response
+                summary = "Completed"
+                if content:
+                    # Take first sentence as summary
+                    summary = content.split('.')[0][:100]
+
+                if display:
+                    display.complete_step(step_index, summary)
+
                 memory.write_agent_context(agent_def.name, final_content)
                 return {**state, "status": "running", "current_step": state["current_step"]}
 
@@ -138,7 +158,10 @@ def make_node(
 
                 # Display tool execution to user
                 args_preview = str(arguments_str)[:50] + "..." if len(str(arguments_str)) > 50 else str(arguments_str)
-                console.print(f"  [dim]→ Calling {tool_name}({args_preview})[/dim]")
+                if display:
+                    display.report_tool_call(tool_name, args_preview)
+                else:
+                    console.print(f"  [dim]→ Calling {tool_name}({args_preview})[/dim]")
 
                 # Validate tool is in agent's allowed tools list
                 if tool_name not in allowed_tools:
@@ -181,13 +204,19 @@ def make_node(
                                 "success": True,
                                 "output": output
                             })
-                            console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
+                            if display:
+                                display.report_tool_result(tool_name, success=True)
+                            else:
+                                console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
                         else:
                             result_content = json.dumps({
                                 "success": False,
                                 "error": result.error
                             })
-                            console.print(f"  [yellow]⚠ {tool_name} failed: {result.error}[/yellow]")
+                            if display:
+                                display.report_tool_result(tool_name, success=False, error=result.error)
+                            else:
+                                console.print(f"  [yellow]⚠ {tool_name} failed: {result.error}[/yellow]")
                     except (TypeError, ValueError) as e:
                         # Handle non-serializable objects
                         logger.warning(f"Tool result not JSON serializable, converting to string: {e}")
@@ -200,13 +229,19 @@ def make_node(
                                 "success": True,
                                 "output": output_str
                             })
-                            console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
+                            if display:
+                                display.report_tool_result(tool_name, success=True)
+                            else:
+                                console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
                         else:
                             result_content = json.dumps({
                                 "success": False,
                                 "error": str(result.error)
                             })
-                            console.print(f"  [yellow]⚠ {tool_name} failed: {str(result.error)}[/yellow]")
+                            if display:
+                                display.report_tool_result(tool_name, success=False, error=str(result.error))
+                            else:
+                                console.print(f"  [yellow]⚠ {tool_name} failed: {str(result.error)}[/yellow]")
 
                     logger.debug(f"Tool {tool_name} executed: success={result.success}")
 
@@ -244,6 +279,19 @@ def make_node(
                 final_content = f"{content}\n\n{final_content}"
         elif hasattr(response, "content") and response.content:
             final_content = f"{response.content}\n\n{final_content}"
+
+        # Extract summary from LLM response
+        summary = "Completed with max iterations"
+        if isinstance(response, dict):
+            content = response.get("content", "")
+            if content:
+                # Take first sentence as summary
+                summary = content.split('.')[0][:100]
+        elif hasattr(response, "content") and response.content:
+            summary = response.content.split('.')[0][:100]
+
+        if display:
+            display.complete_step(step_index, summary)
 
         memory.write_agent_context(agent_def.name, final_content)
         return {**state, "status": "running", "current_step": state["current_step"]}
