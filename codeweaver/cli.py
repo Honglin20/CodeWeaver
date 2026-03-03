@@ -47,7 +47,7 @@ def _find_workflow_file(name: str) -> Path | None:
     return None
 
 
-def create_llm_fn(messages: list[dict]) -> str:
+def create_llm_fn(messages: list[dict], tools: list[dict] | None = None) -> str:
     """Real LLM function using litellm with configurable API."""
     import os
     import litellm
@@ -59,13 +59,18 @@ def create_llm_fn(messages: list[dict]) -> str:
     ssl_verify = os.getenv("CODEWEAVER_SSL_VERIFY", "true").lower() == "true"
 
     try:
-        response = litellm.completion(
-            model=model,
-            messages=messages,
-            api_key=api_key,
-            api_base=api_base,
-            verify=ssl_verify,
-        )
+        kwargs = {
+            "model": model,
+            "messages": messages,
+            "api_key": api_key,
+            "api_base": api_base,
+            "verify": ssl_verify,
+        }
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+
+        response = litellm.completion(**kwargs)
         return response.choices[0].message.content
     except Exception as e:
         console.print(f"[red]LLM API error: {e}[/red]")

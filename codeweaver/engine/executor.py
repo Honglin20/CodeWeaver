@@ -67,7 +67,8 @@ class WorkflowExecutor:
             # Execute with progress tracking
             for i, plan in enumerate(plans, 1):
                 console.print(f"[cyan]Step {i}/{len(plans)}:[/cyan] {plan.goal}")
-                console.print(f"[dim]  Agent: {plan.agent_name}[/dim]")
+                if plan.agents:
+                    console.print(f"[dim]  Agents: {', '.join(plan.agents)}[/dim]")
 
             compiled.invoke(initial_state, config=config)
 
