@@ -23,6 +23,7 @@ def compile_graph(
     llm_fn=None,
     workflow_steps: list[StepDef] | None = None,
     project_root: str = ".",
+    display=None,  # Add display parameter
 ) -> StateGraph:
     graph = StateGraph(WorkflowState)
     total_steps = len(plans)
@@ -51,7 +52,10 @@ def compile_graph(
                 llm_fn,
                 step_goal=step_goal,
                 step_raw_text=step_raw_text,
-                project_root=project_root
+                project_root=project_root,
+                display=display,  # Pass display to node
+                step_index=plan.index,  # Pass step index
+                step_agents=plan.agents,  # Pass agents list
             )
         else:
             def node_fn(state: dict) -> dict:
