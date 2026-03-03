@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from rich.console import Console
 from rich.table import Table
 
@@ -7,7 +7,7 @@ from rich.table import Table
 class StepInfo:
     index: int
     goal: str
-    agents: list[str]
+    agents: list[str] = field(default_factory=list)
 
 
 class ExecutionDisplay:
@@ -50,6 +50,3 @@ class ExecutionDisplay:
             self.console.print(f"\n[bold green]✓ Workflow completed[/bold green]")
         else:
             self.console.print(f"\n[bold red]✗ Workflow failed:[/bold red] {error}")
-
-    def update_progress(self, current: int, total: int) -> None:
-        pass
