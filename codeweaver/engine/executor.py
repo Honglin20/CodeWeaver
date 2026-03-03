@@ -46,7 +46,8 @@ class WorkflowExecutor:
         graph = compile_graph(
             plans, registry, memory, self.llm_fn,
             workflow_steps=workflow_def.steps,
-            project_root=project_root
+            project_root=project_root,
+            display=self.display
         )
 
         with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
@@ -93,7 +94,8 @@ class WorkflowExecutor:
         graph = compile_graph(
             plans, registry, memory, self.llm_fn,
             workflow_steps=workflow_def.steps,
-            project_root=project_root
+            project_root=project_root,
+            display=self.display
         )
         with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
             compiled = graph.compile(checkpointer=checkpointer)
