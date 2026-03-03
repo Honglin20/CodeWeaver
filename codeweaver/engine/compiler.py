@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END
 from codeweaver.engine.orchestrator import StepPlan
 from codeweaver.engine.node_factory import make_node, MAX_RETRIES
 from codeweaver.parser.agent import AgentDef
+from codeweaver.parser.workflow import StepDef
 from codeweaver.memory.manager import MemoryManager
 
 
@@ -20,15 +21,36 @@ def compile_graph(
     agent_registry: dict[str, AgentDef],
     memory: MemoryManager,
     llm_fn=None,
+    workflow_steps: list[StepDef] | None = None,
 ) -> StateGraph:
     graph = StateGraph(WorkflowState)
     total_steps = len(plans)
+
+    # Create a mapping from step index to StepDef for quick lookup
+    step_map = {}
+    if workflow_steps:
+        step_map = {step.index: step for step in workflow_steps}
 
     for plan in plans:
         node_name = f"step_{plan.index}"
         if plan.agents and plan.agents[0] in agent_registry:
             agent_def = agent_registry[plan.agents[0]]
-            node_fn = make_node(agent_def, memory, total_steps, llm_fn)
+
+            # Extract step context from workflow_steps if available
+            step_goal = plan.goal
+            step_raw_text = ""
+            if plan.index in step_map:
+                step_def = step_map[plan.index]
+                step_raw_text = step_def.raw_text
+
+            node_fn = make_node(
+                agent_def,
+                memory,
+                total_steps,
+                llm_fn,
+                step_goal=step_goal,
+                step_raw_text=step_raw_text
+            )
         else:
             def node_fn(state: dict) -> dict:
                 return state

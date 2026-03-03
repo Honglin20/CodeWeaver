@@ -83,3 +83,112 @@ def test_max_retries_exits_loop(tmp_path):
     if conditional:
         assert conditional(state_max) == END
         assert conditional(state_retry) == "step_0"
+
+
+def test_node_receives_step_context():
+    """Test that step goal and raw_text are passed to the agent in the user message."""
+    memory = _mock_memory()
+    agent = _agent()
+
+    step_goal = "Analyze the codebase structure"
+    step_raw_text = "Look at all Python files and identify the main modules."
+
+    # Track the messages passed to the LLM
+    captured_messages = []
+    def capture_llm(msgs):
+        captured_messages.extend(msgs)
+        return "analysis complete"
+
+    node = make_node(
+        agent,
+        memory,
+        total_steps=3,
+        llm_fn=capture_llm,
+        step_goal=step_goal,
+        step_raw_text=step_raw_text
+    )
+
+    state = {
+        "current_step": 1,
+        "task_description": "do something",
+        "status": "running",
+        "iteration": 0,
+        "memory_root": "/tmp",
+        "error_count": 0
+    }
+
+    node(state)
+
+    # Verify the user message contains step context
+    user_messages = [m for m in captured_messages if m["role"] == "user"]
+    assert len(user_messages) == 1
+
+    user_content = user_messages[0]["content"]
+    assert "# Current Step Context" in user_content
+    assert f"**Goal:** {step_goal}" in user_content
+    assert f"**Instructions:**\n{step_raw_text}" in user_content
+    assert "# Memory Context" in user_content
+    assert "bundle" in user_content  # from mock memory
+
+
+def test_compile_graph_passes_step_context(tmp_path):
+    """Test that compile_graph extracts and passes step context to nodes."""
+    from codeweaver.parser.workflow import StepDef
+
+    # Create workflow steps with raw_text
+    workflow_steps = [
+        StepDef(
+            index=0,
+            title="Analyze code",
+            raw_text="Review all Python files in the src/ directory and create a summary.",
+            explicit_agents=["agent_a"]
+        ),
+        StepDef(
+            index=1,
+            title="Generate report",
+            raw_text="Create a markdown report with findings from the analysis.",
+            explicit_agents=["agent_a"]
+        )
+    ]
+
+    plans = [
+        StepPlan(index=0, goal="Analyze code structure", agents=["agent_a"]),
+        StepPlan(index=1, goal="Generate analysis report", agents=["agent_a"])
+    ]
+
+    registry = {"agent_a": _agent()}
+    memory = MemoryManager(tmp_path)
+
+    # Track messages to verify step context is passed
+    captured_messages = []
+    def capture_llm(msgs):
+        captured_messages.extend(msgs)
+        return "done"
+
+    graph = compile_graph(plans, registry, memory, llm_fn=capture_llm, workflow_steps=workflow_steps)
+
+    # Verify graph was compiled with step context
+    assert len(graph.nodes) == 2
+
+    # Compile and execute the graph to verify step context is passed
+    compiled = graph.compile()
+    state = {
+        "current_step": 0,
+        "task_description": "",
+        "status": "running",
+        "iteration": 0,
+        "memory_root": str(tmp_path),
+        "error_count": 0
+    }
+
+    compiled.invoke(state)
+
+    # Verify the step context was included in the LLM calls
+    user_messages = [m for m in captured_messages if m["role"] == "user"]
+    assert len(user_messages) >= 1
+
+    # Check first step's context
+    first_user_msg = user_messages[0]["content"]
+    assert "# Current Step Context" in first_user_msg
+    assert "**Goal:** Analyze code structure" in first_user_msg
+    assert "**Instructions:**\nReview all Python files in the src/ directory" in first_user_msg

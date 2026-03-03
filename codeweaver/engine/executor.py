@@ -27,7 +27,7 @@ class WorkflowExecutor:
         orchestrator = Orchestrator(registry, memory, self.llm_fn)
         plans = orchestrator.analyze(workflow_def)
 
-        graph = compile_graph(plans, registry, memory, self.llm_fn)
+        graph = compile_graph(plans, registry, memory, self.llm_fn, workflow_steps=workflow_def.steps)
         with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
             compiled = graph.compile(checkpointer=checkpointer)
 
@@ -60,7 +60,7 @@ class WorkflowExecutor:
         orchestrator = Orchestrator(registry, memory, self.llm_fn)
         plans = orchestrator.analyze(workflow_def)
 
-        graph = compile_graph(plans, registry, memory, self.llm_fn)
+        graph = compile_graph(plans, registry, memory, self.llm_fn, workflow_steps=workflow_def.steps)
         with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
             compiled = graph.compile(checkpointer=checkpointer)
 
