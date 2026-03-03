@@ -24,9 +24,14 @@ cd CodeWeaver
 pip install -e .
 
 # Configure LLM API (required)
-export KIMI_API='your-api-key'
-export KIMI_URL='https://api.moonshot.cn/v1'
+export CODEWEAVER_API_KEY='your-api-key'
+export CODEWEAVER_API_BASE='https://api.moonshot.cn/v1'  # or your LLM provider
+export CODEWEAVER_MODEL='moonshot/moonshot-v1-8k'  # optional, defaults to moonshot-v1-8k
+export CODEWEAVER_SSL_VERIFY='true'  # optional, defaults to true
 ```
+
+**Supported LLM Providers:**
+CodeWeaver uses litellm, supporting OpenAI, Claude, Moonshot (Kimi), and other providers. Configure via environment variables above.
 
 ## Quick Start
 
@@ -114,7 +119,13 @@ Read the configuration file and extract database settings.
 
 ### Creating Custom Agents
 
-Agents are defined in YAML files in `.codeweaver/agents/` directory:
+CodeWeaver includes built-in agents that are available in all projects:
+- **structure-agent** - Analyzes project structure using hierarchical code tree
+- **interact-agent** - Handles user interaction and prompts
+- **validator-agent** - Validates code changes and test results
+- **coder-agent** - Writes and modifies code
+
+You can create custom agents or override built-ins by adding YAML files to `.codeweaver/agents/`:
 
 ```yaml
 name: my-agent
@@ -131,6 +142,7 @@ tools:
   - read_file
   - run_command
   - list_files
+  - build_code_tree
 memory:
   read:
     - memory/input.md
@@ -147,7 +159,7 @@ max_tokens: 4096
 - `name` - Unique agent identifier (matches @agent-name in workflows)
 - `description` - Brief description for workflow analyzer
 - `system_prompt` - Instructions for the LLM (supports multi-line)
-- `tools` - List of available tools (read_file, run_command, list_files, debugger)
+- `tools` - List of available tools (see Available Tools below)
 - `memory.read` - Files this agent reads from memory
 - `memory.write` - Files this agent writes to memory
 - `model` - LLM model to use (gpt-4o, moonshot-v1-8k, etc.)
@@ -157,6 +169,8 @@ max_tokens: 4096
 
 **Filesystem Tools:**
 - `read_file` - Read file contents
+- `list_files` - List files matching glob pattern
+- `build_code_tree` - Generate hierarchical project structure (efficient for large projects)
 - `list_files` - List directory contents
 - `run_command` - Execute shell commands (sandboxed)
 
