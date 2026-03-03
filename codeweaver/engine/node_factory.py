@@ -167,9 +167,19 @@ def make_node(
                     # Format result for LLM with safe JSON serialization
                     try:
                         if result.success:
+                            # Truncate large outputs to prevent token overflow
+                            output = result.output
+                            if isinstance(output, str) and len(output) > 2000:
+                                output = output[:1000] + "\n...(truncated)...\n" + output[-1000:]
+                            elif isinstance(output, list) and len(str(output)) > 2000:
+                                # For lists, keep first and last few items
+                                output_str = str(output)
+                                if len(output_str) > 2000:
+                                    output = f"[{len(output)} items - showing first 10 and last 10]\n" + str(output[:10]) + "\n...\n" + str(output[-10:])
+
                             result_content = json.dumps({
                                 "success": True,
-                                "output": result.output
+                                "output": output
                             })
                             console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
                         else:
@@ -182,9 +192,13 @@ def make_node(
                         # Handle non-serializable objects
                         logger.warning(f"Tool result not JSON serializable, converting to string: {e}")
                         if result.success:
+                            output_str = str(result.output)
+                            if len(output_str) > 2000:
+                                output_str = output_str[:1000] + "\n...(truncated)...\n" + output_str[-1000:]
+
                             result_content = json.dumps({
                                 "success": True,
-                                "output": str(result.output)
+                                "output": output_str
                             })
                             console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
                         else:
