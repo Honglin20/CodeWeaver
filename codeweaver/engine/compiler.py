@@ -39,8 +39,8 @@ def compile_graph(
             # Extract step context from workflow_steps if available
             step_goal = plan.goal
             step_raw_text = ""
-            if plan.index in step_map:
-                step_def = step_map[plan.index]
+            step_def = step_map.get(plan.index)
+            if step_def:
                 step_raw_text = step_def.raw_text
 
             node_fn = make_node(

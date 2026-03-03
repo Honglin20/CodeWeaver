@@ -192,3 +192,180 @@ def test_compile_graph_passes_step_context(tmp_path):
     assert "# Current Step Context" in first_user_msg
     assert "**Goal:** Analyze code structure" in first_user_msg
     assert "**Instructions:**\nReview all Python files in the src/ directory" in first_user_msg
+
+
+def test_compile_graph_with_none_workflow_steps(tmp_path):
+    """Test that compile_graph handles None workflow_steps gracefully."""
+    plans = [
+        StepPlan(index=0, goal="Do something", agents=["agent_a"]),
+        StepPlan(index=1, goal="Do something else", agents=["agent_a"])
+    ]
+
+    registry = {"agent_a": _agent()}
+    memory = MemoryManager(tmp_path)
+
+    # Should not raise an error when workflow_steps is None
+    graph = compile_graph(plans, registry, memory, llm_fn=lambda msgs: "done", workflow_steps=None)
+    assert len(graph.nodes) == 2
+
+
+def test_compile_graph_with_incomplete_workflow_steps(tmp_path):
+    """Test that compile_graph handles workflow_steps with fewer items than plans."""
+    from codeweaver.parser.workflow import StepDef
+
+    # Only provide workflow_steps for first step, not second
+    workflow_steps = [
+        StepDef(
+            index=0,
+            title="First step",
+            raw_text="Do the first thing.",
+            explicit_agents=["agent_a"]
+        )
+    ]
+
+    plans = [
+        StepPlan(index=0, goal="First goal", agents=["agent_a"]),
+        StepPlan(index=1, goal="Second goal", agents=["agent_a"])
+    ]
+
+    registry = {"agent_a": _agent()}
+    memory = MemoryManager(tmp_path)
+
+    captured_messages = []
+    def capture_llm(msgs):
+        captured_messages.extend(msgs)
+        return "done"
+
+    # Should not raise KeyError when step 1 is not in workflow_steps
+    graph = compile_graph(plans, registry, memory, llm_fn=capture_llm, workflow_steps=workflow_steps)
+    assert len(graph.nodes) == 2
+
+    # Execute to verify behavior
+    compiled = graph.compile()
+    state = {
+        "current_step": 0,
+        "task_description": "",
+        "status": "running",
+        "iteration": 0,
+        "memory_root": str(tmp_path),
+        "error_count": 0
+    }
+
+    compiled.invoke(state)
+
+    # First step should have raw_text, second should only have goal
+    user_messages = [m for m in captured_messages if m["role"] == "user"]
+    assert len(user_messages) >= 1
+    first_msg = user_messages[0]["content"]
+    assert "Do the first thing" in first_msg
+
+
+def test_compile_graph_with_mismatched_indices(tmp_path):
+    """Test that compile_graph handles workflow_steps with non-matching indices."""
+    from codeweaver.parser.workflow import StepDef
+
+    # workflow_steps has index 5, but plans only has indices 0 and 1
+    workflow_steps = [
+        StepDef(
+            index=5,
+            title="Wrong index",
+            raw_text="This won't match any plan.",
+            explicit_agents=["agent_a"]
+        )
+    ]
+
+    plans = [
+        StepPlan(index=0, goal="First goal", agents=["agent_a"]),
+        StepPlan(index=1, goal="Second goal", agents=["agent_a"])
+    ]
+
+    registry = {"agent_a": _agent()}
+    memory = MemoryManager(tmp_path)
+
+    # Should not raise error, just won't find matching step_def
+    graph = compile_graph(plans, registry, memory, llm_fn=lambda msgs: "done", workflow_steps=workflow_steps)
+    assert len(graph.nodes) == 2
+
+
+def test_node_with_empty_step_raw_text():
+    """Test that node handles empty step_raw_text but present step_goal."""
+    memory = _mock_memory()
+    agent = _agent()
+
+    step_goal = "Do something important"
+    step_raw_text = ""  # Empty raw text
+
+    captured_messages = []
+    def capture_llm(msgs):
+        captured_messages.extend(msgs)
+        return "done"
+
+    node = make_node(
+        agent,
+        memory,
+        total_steps=1,
+        llm_fn=capture_llm,
+        step_goal=step_goal,
+        step_raw_text=step_raw_text
+    )
+
+    state = {
+        "current_step": 0,
+        "task_description": "",
+        "status": "running",
+        "iteration": 0,
+        "memory_root": "/tmp",
+        "error_count": 0
+    }
+
+    node(state)
+
+    user_messages = [m for m in captured_messages if m["role"] == "user"]
+    assert len(user_messages) == 1
+
+    user_content = user_messages[0]["content"]
+    # Should include step context header and goal, but not instructions
+    assert "# Current Step Context" in user_content
+    assert f"**Goal:** {step_goal}" in user_content
+    assert "**Instructions:**" not in user_content
+
+
+def test_node_with_no_step_context():
+    """Test that node works without any step context (backward compatibility)."""
+    memory = _mock_memory()
+    agent = _agent()
+
+    captured_messages = []
+    def capture_llm(msgs):
+        captured_messages.extend(msgs)
+        return "done"
+
+    # No step_goal or step_raw_text provided
+    node = make_node(
+        agent,
+        memory,
+        total_steps=1,
+        llm_fn=capture_llm
+    )
+
+    state = {
+        "current_step": 0,
+        "task_description": "task",
+        "status": "running",
+        "iteration": 0,
+        "memory_root": "/tmp",
+        "error_count": 0
+    }
+
+    node(state)
+
+    user_messages = [m for m in captured_messages if m["role"] == "user"]
+    assert len(user_messages) == 1
+
+    user_content = user_messages[0]["content"]
+    # Should not include step context header when no context provided
+    assert "# Current Step Context" not in user_content
+    # But should still include memory context
+    assert "# Memory Context" in user_content
+    assert "bundle" in user_content
+

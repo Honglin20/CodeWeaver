@@ -13,7 +13,19 @@ def make_node(
     step_goal: str = "",
     step_raw_text: str = "",
 ) -> Callable:
-    """Returns a LangGraph node function for the given agent."""
+    """Returns a LangGraph node function for the given agent.
+
+    Args:
+        agent_def: The agent definition containing system prompt and model config
+        memory: Memory manager for loading/writing agent context
+        total_steps: Total number of steps in the workflow
+        llm_fn: Optional custom LLM function for testing/mocking
+        step_goal: High-level goal for the current step (from orchestrator)
+        step_raw_text: Raw markdown text from workflow definition (user instructions)
+
+    Returns:
+        A callable node function compatible with LangGraph
+    """
 
     def node(state: dict) -> dict:
         bundle = memory.load_agent_memory_bundle(
@@ -22,6 +34,7 @@ def make_node(
 
         # Build structured context with step information
         context_parts = []
+        # Include step context if either goal or raw_text is provided
         if step_goal or step_raw_text:
             context_parts.append("# Current Step Context")
             if step_goal:
