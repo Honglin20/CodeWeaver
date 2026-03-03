@@ -11,41 +11,34 @@ from codeweaver.engine.compiler import compile_graph, WorkflowState
 from codeweaver.engine.orchestrator import Orchestrator
 from codeweaver.parser.agent import load_agent_registry
 from codeweaver.memory.manager import MemoryManager
+from codeweaver.engine.display import ExecutionDisplay, StepInfo
 
 console = Console()
 
 
 class WorkflowExecutor:
-    def __init__(self, codeweaver_root: Path, llm_fn=None):
+    def __init__(self, codeweaver_root: Path, llm_fn=None, display: ExecutionDisplay = None):
         self.root = codeweaver_root
         self.llm_fn = llm_fn
         self.checkpoints_db = str(codeweaver_root / "checkpoints.db")
         self.runs_file = codeweaver_root / "runs.yaml"
+        self.display = display or ExecutionDisplay()
 
     def run(self, workflow_def, thread_id: str | None = None) -> str:
         """Start a new workflow run. Returns thread_id."""
         thread_id = thread_id or str(uuid4())
-
-        console.print(f"\n[bold cyan]Starting workflow:[/bold cyan] {workflow_def.name}")
-        console.print(f"[dim]Thread ID: {thread_id}[/dim]\n")
 
         agents_dir = self.root / "agents"
         registry = load_agent_registry(agents_dir) if agents_dir.exists() else {}
 
         memory = MemoryManager(self.root / "memory")
 
-        console.print("[yellow]Analyzing workflow and generating execution plan...[/yellow]")
         orchestrator = Orchestrator(registry, memory, self.llm_fn)
         plans = orchestrator.analyze(workflow_def)
 
-        console.print(f"[green]✓[/green] Generated {len(plans)} execution steps\n")
-
-        # Display workflow overview
-        console.print("[bold]Workflow Overview:[/bold]")
-        for i, plan in enumerate(plans, 1):
-            agents_str = f" [{', '.join(plan.agents)}]" if plan.agents else ""
-            console.print(f"  {i}. {plan.goal}{agents_str}")
-        console.print()
+        # Show workflow overview
+        steps_info = [StepInfo(index=p.index, goal=p.goal, agents=p.agents) for p in plans]
+        self.display.start_workflow(workflow_def.name, steps_info)
 
         # Determine project root (parent of .codeweaver directory)
         project_root = str(self.root.parent)
@@ -55,8 +48,6 @@ class WorkflowExecutor:
             workflow_steps=workflow_def.steps,
             project_root=project_root
         )
-
-        console.print("[bold]Executing workflow...[/bold]\n")
 
         with SqliteSaver.from_conn_string(self.checkpoints_db) as checkpointer:
             compiled = graph.compile(checkpointer=checkpointer)
@@ -71,15 +62,13 @@ class WorkflowExecutor:
             )
             config = {"configurable": {"thread_id": thread_id}}
 
-            # Execute with progress tracking
-            for i, plan in enumerate(plans, 1):
-                console.print(f"[cyan]Step {i}/{len(plans)}:[/cyan] {plan.goal}")
-                if plan.agents:
-                    console.print(f"[dim]  Agents: {', '.join(plan.agents)}[/dim]")
+            try:
+                compiled.invoke(initial_state, config=config)
+                self.display.complete_workflow(success=True)
+            except Exception as e:
+                self.display.complete_workflow(success=False, error=str(e))
+                raise
 
-            compiled.invoke(initial_state, config=config)
-
-        console.print(f"\n[bold green]✓ Workflow completed successfully[/bold green]")
         self._save_run(thread_id, workflow_def.name, "completed")
         return thread_id
 

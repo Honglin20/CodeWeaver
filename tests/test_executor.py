@@ -69,3 +69,32 @@ def test_completed_run_not_resumable(tmp_path):
 
     with pytest.raises(ValueError, match="already completed"):
         executor.resume("tid-3", make_workflow())
+
+
+@patch("codeweaver.engine.executor.SqliteSaver")
+@patch("codeweaver.engine.executor.compile_graph")
+@patch("codeweaver.engine.executor.Orchestrator")
+def test_executor_uses_display(mock_orch_cls, mock_compile, mock_saver, tmp_path):
+    from codeweaver.engine.display import ExecutionDisplay
+    from unittest.mock import Mock
+
+    display = Mock(spec=ExecutionDisplay)
+    executor = WorkflowExecutor(tmp_path, llm_fn=lambda msgs, tools=None: "test")
+    executor.display = display
+
+    compiled = MagicMock()
+    mock_compile.return_value.compile.return_value = compiled
+    mock_orch_cls.return_value.analyze.return_value = []
+
+    workflow = WorkflowDef(
+        name="test",
+        description="test",
+        entry_command=None,
+        steps=[StepDef(index=1, title="Do something", raw_text="@test-agent: do something", explicit_agents=["test-agent"])]
+    )
+
+    executor.run(workflow)
+
+    # Verify display methods were called
+    display.start_workflow.assert_called_once()
+    display.complete_workflow.assert_called_once()
