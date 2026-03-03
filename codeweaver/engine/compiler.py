@@ -22,6 +22,7 @@ def compile_graph(
     memory: MemoryManager,
     llm_fn=None,
     workflow_steps: list[StepDef] | None = None,
+    project_root: str = ".",
 ) -> StateGraph:
     graph = StateGraph(WorkflowState)
     total_steps = len(plans)
@@ -49,7 +50,8 @@ def compile_graph(
                 total_steps,
                 llm_fn,
                 step_goal=step_goal,
-                step_raw_text=step_raw_text
+                step_raw_text=step_raw_text,
+                project_root=project_root
             )
         else:
             def node_fn(state: dict) -> dict:
