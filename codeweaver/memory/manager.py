@@ -37,7 +37,12 @@ class MemoryManager:
     def write_agent_context(self, agent_name: str, content: str) -> None:
         path = self.root / "agents" / agent_name / "context.md"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+
+        # Add timestamp header
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        full_content = f"<!-- Generated: {timestamp} -->\n\n{content}"
+
+        path.write_text(full_content)
 
     def read_agent_context(self, agent_name: str) -> str:
         path = self.root / "agents" / agent_name / "context.md"

@@ -120,9 +120,13 @@ def make_node(
             })
 
             # Keep conversation history manageable to avoid token limits
-            # Keep system message + last 10 messages (5 exchanges)
-            if len(messages) > 11:
-                messages = [messages[0]] + messages[-10:]
+            # Keep system message + user message + recent tool exchanges
+            # Each tool exchange is: assistant (with tool_calls) + N tool results
+            # We keep the last 2 complete exchanges (roughly 6-8 messages)
+            if len(messages) > 15:
+                # Always keep: system (0), user (1)
+                # Keep last 12 messages (should be ~2 complete tool exchanges)
+                messages = messages[:2] + messages[-12:]
 
             # Execute each tool and add results
             for tool_call in (tool_calls if isinstance(tool_calls, list) else [tool_calls]):
@@ -168,11 +172,13 @@ def make_node(
                                 "success": True,
                                 "output": result.output
                             })
+                            console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
                         else:
                             result_content = json.dumps({
                                 "success": False,
                                 "error": result.error
                             })
+                            console.print(f"  [yellow]⚠ {tool_name} failed: {result.error}[/yellow]")
                     except (TypeError, ValueError) as e:
                         # Handle non-serializable objects
                         logger.warning(f"Tool result not JSON serializable, converting to string: {e}")
@@ -181,22 +187,26 @@ def make_node(
                                 "success": True,
                                 "output": str(result.output)
                             })
+                            console.print(f"  [dim green]✓ {tool_name} succeeded[/dim green]")
                         else:
                             result_content = json.dumps({
                                 "success": False,
                                 "error": str(result.error)
                             })
+                            console.print(f"  [yellow]⚠ {tool_name} failed: {str(result.error)}[/yellow]")
 
                     logger.debug(f"Tool {tool_name} executed: success={result.success}")
 
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse tool arguments: {e}")
+                    console.print(f"  [red]✗ {tool_name} - Invalid arguments: {str(e)}[/red]")
                     result_content = json.dumps({
                         "success": False,
                         "error": f"Invalid arguments format: {str(e)}"
                     })
                 except Exception as e:
                     logger.error(f"Tool execution failed: {e}", exc_info=True)
+                    console.print(f"  [red]✗ {tool_name} - Execution error: {str(e)}[/red]")
                     result_content = json.dumps({
                         "success": False,
                         "error": str(e)
