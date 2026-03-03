@@ -1,4 +1,5 @@
 import sys
+import re
 from pathlib import Path
 import typer
 import yaml
@@ -46,25 +47,29 @@ def _find_workflow_file(name: str) -> Path | None:
     return None
 
 
-def _mock_llm_fn(messages: list[dict]) -> str:
-    """Real LLM function using Kimi API."""
+def create_llm_fn(messages: list[dict]) -> str:
+    """Real LLM function using litellm with configurable API."""
     import os
     import litellm
 
-    # Use Kimi API
-    api_key = "sk-IA0OXgtva7EmahBVdzkCJgcJxnmo4ja6O0M0M146HniteI3m"
-    api_base = "https://api.moonshot.cn/v1"
+    # Get API configuration from environment variables
+    api_key = os.getenv("CODEWEAVER_API_KEY", "sk-IA0OXgtva7EmahBVdzkCJgcJxnmo4ja6O0M0M146HniteI3m")
+    api_base = os.getenv("CODEWEAVER_API_BASE", "https://api.moonshot.cn/v1")
+    model = os.getenv("CODEWEAVER_MODEL", "moonshot/moonshot-v1-8k")
+    ssl_verify = os.getenv("CODEWEAVER_SSL_VERIFY", "true").lower() == "true"
 
     try:
         response = litellm.completion(
-            model="moonshot/moonshot-v1-8k",
+            model=model,
             messages=messages,
             api_key=api_key,
             api_base=api_base,
+            verify=ssl_verify,
         )
         return response.choices[0].message.content
     except Exception as e:
         console.print(f"[red]LLM API error: {e}[/red]")
+        console.print(f"[yellow]Tip: Set CODEWEAVER_API_KEY and CODEWEAVER_API_BASE environment variables[/yellow]")
         raise
 
 
@@ -81,7 +86,7 @@ def _run_analyze(wf_file: Path, auto: bool) -> None:
     registry = load_agent_registry(agents_dir) if agents_dir.exists() else {}
 
     # Create analyzer with mock LLM
-    analyzer = WorkflowAnalyzer(registry=registry, llm_fn=_mock_llm_fn)
+    analyzer = WorkflowAnalyzer(registry=registry, llm_fn=create_llm_fn)
 
     # Analyze workflow
     tree = analyzer.analyze(wf)
@@ -100,7 +105,7 @@ def _run_analyze(wf_file: Path, auto: bool) -> None:
         console.print(f"\n[yellow]Found {len(tree.gaps)} gaps. Generating agents...[/yellow]")
         generated_agents = []
         for gap in tree.gaps:
-            agent = generate_agent(gap, _mock_llm_fn, agents_dir)
+            agent = generate_agent(gap, create_llm_fn, agents_dir)
             generated_agents.append(agent)
             console.print(f"[green]Generated: {agent.name}[/green]")
 
@@ -142,7 +147,7 @@ def _dispatch(text: str) -> None:
             console.print(f"[red]Workflow file not found: {name}[/red]")
             return
         wf = parse_workflow(wf_file.read_text())
-        executor = WorkflowExecutor(_cw_root())
+        executor = WorkflowExecutor(_cw_root(), llm_fn=create_llm_fn)
         tid = executor.run(wf)
         console.print(f"[green]Completed. thread_id: {tid}[/green]")
 
@@ -161,7 +166,7 @@ def _dispatch(text: str) -> None:
             console.print(f"[red]Workflow file not found: {wf_name}[/red]")
             return
         wf = parse_workflow(wf_file.read_text())
-        executor = WorkflowExecutor(_cw_root())
+        executor = WorkflowExecutor(_cw_root(), llm_fn=create_llm_fn)
         executor.resume(tid, wf)
         console.print(f"[green]Resumed and completed: {tid}[/green]")
 
@@ -226,7 +231,7 @@ def _dispatch(text: str) -> None:
 
 
 def _repl() -> None:
-    completer = WordCompleter(COMMANDS, pattern=r"[/\w]+")
+    completer = WordCompleter(COMMANDS, pattern=re.compile(r"[\w/]+"))
     session = PromptSession(completer=completer)
     console.print("[bold cyan]CodeWeaver[/bold cyan] — type /help for commands")
 
@@ -252,7 +257,7 @@ def run(workflow: str):
         console.print(f"[red]Workflow file not found: {workflow}[/red]")
         raise typer.Exit(1)
     wf = parse_workflow(wf_file.read_text())
-    executor = WorkflowExecutor(_cw_root(), llm_fn=_mock_llm_fn)
+    executor = WorkflowExecutor(_cw_root(), llm_fn=create_llm_fn)
     tid = executor.run(wf)
     console.print(f"[green]Completed. thread_id: {tid}[/green]")
 
@@ -270,7 +275,7 @@ def resume(thread_id: str):
         console.print(f"[red]Workflow file not found: {wf_name}[/red]")
         raise typer.Exit(1)
     wf = parse_workflow(wf_file.read_text())
-    executor = WorkflowExecutor(_cw_root(), llm_fn=_mock_llm_fn)
+    executor = WorkflowExecutor(_cw_root(), llm_fn=create_llm_fn)
     executor.resume(thread_id, wf)
     console.print(f"[green]Resumed and completed: {thread_id}[/green]")
 
