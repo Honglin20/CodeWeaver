@@ -36,16 +36,54 @@ tools:
 [源节点] --> [目标节点]
 ```
 
-## 关键规则
-1. **条件格式**：必须用方括号，例如 `[passed]` `[failed]` `[confirmed]`
-2. **节点名**：英文下划线格式
-3. **Memory 推断**：
-   - 无状态检查（如校验）→ ultra_short
-   - 需要对话上下文 → short_term
-   - 需要任务历史 → medium_term
-4. **工具推断**：
-   - 执行命令 → bash_executor
-   - 读写文件 → read_file, write_file
-   - 搜索知识 → search_long_term
+## 关键规则（必须严格遵守）
+
+### 1. 条件格式（CRITICAL）
+**所有条件必须用方括号包裹，不能使用中文描述或其他格式**
+
+✅ 正确示例：
+- `validate --> process : [passed]`
+- `check --> retry : [failed]`
+- `review --> approve : [confirmed]`
+
+❌ 错误示例：
+- `validate --> process : 验证通过` （不能用中文）
+- `check --> retry : failed` （缺少方括号）
+- `review --> approve : 性能提升<10%` （不能用表达式）
+
+**条件命名规范**：
+- 成功/失败：`[passed]` / `[failed]`
+- 确认/拒绝：`[confirmed]` / `[rejected]`
+- 成功/错误：`[success]` / `[error]`
+- 自定义条件：`[retry]` `[timeout]` `[complete]`
+
+### 2. 节点名格式
+- 必须使用英文
+- 多个单词用下划线连接
+- 例如：`validate_code`, `generate_report`, `manual_review`
+
+### 3. Memory 策略推断
+- **ultra_short**: 无状态检查（如校验、测试）
+- **short_term**: 需要对话上下文（如交互、确认）
+- **medium_term**: 需要任务历史（如报告生成、汇总）
+
+### 4. 工具推断
+- 执行命令/测试 → `mock_test_runner`
+- 读写文件 → `read_file`, `write_file`
+- 搜索知识 → `search_long_term`
+
+### 5. 复杂流程处理
+**循环流程**：
+- 必须有明确的退出条件
+- 循环边也必须用方括号条件
+- 例如：`optimize --> test : [retry]` 和 `test --> done : [complete]`
+
+**并行流程**：
+- 多个节点可以从同一源出发
+- 需要汇聚节点收集结果
+
+**错误处理**：
+- 每个可能失败的步骤都要有 `[failed]` 或 `[error]` 路径
+- 重试逻辑要体现在节点名中（如 `retry_read`）
 
 完成后输出：<ROUTING_FLAG>parsed</ROUTING_FLAG>
