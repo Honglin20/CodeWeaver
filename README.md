@@ -13,6 +13,13 @@ CodeWeaver is a Python CLI tool that enables you to define complex multi-agent w
 - Workflow interruption and resume support
 - Interactive user prompts and tool execution
 
+### Real-Time Execution Feedback
+
+- **Progress tracking**: See workflow overview and current step
+- **Tool visibility**: Watch tools being called in real-time
+- **Step summaries**: Understand what each step accomplished
+- **Clean output**: No debug noise, only relevant information
+
 ## Installation
 
 ```bash
