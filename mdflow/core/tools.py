@@ -2,6 +2,9 @@
 from typing import Callable, Dict, List
 from langchain_core.tools import tool
 from pathlib import Path
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ToolRegistry:
@@ -19,7 +22,7 @@ class ToolRegistry:
             tool_callable: Tool function (should be decorated with @tool)
         """
         self._tools[name] = tool_callable
-        print(f"[ToolRegistry] Registered tool: {name}")
+        logger.debug(f"Registered tool: {name}")
 
     def get_tools(self, names: List[str]) -> List[Callable]:
         """Get tools by names.
@@ -35,7 +38,7 @@ class ToolRegistry:
             if name in self._tools:
                 tools.append(self._tools[name])
             else:
-                print(f"[ToolRegistry] Warning: Tool '{name}' not found")
+                logger.warning(f"Tool '{name}' not found in registry")
         return tools
 
 

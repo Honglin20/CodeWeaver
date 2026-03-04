@@ -1,6 +1,12 @@
 """Structured workflow compiler with MemoryManager integration."""
-from typing import Annotated, TypedDict, Callable
+import sys
+from typing import TypedDict, Callable
 from pathlib import Path
+
+if sys.version_info >= (3, 9):
+    from typing import Annotated
+else:
+    from typing_extensions import Annotated
 
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage
