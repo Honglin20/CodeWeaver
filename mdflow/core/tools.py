@@ -1,6 +1,7 @@
 """Tool registry for agent capabilities."""
 from typing import Callable, Dict, List
 from langchain_core.tools import tool
+from pathlib import Path
 
 
 class ToolRegistry:
@@ -65,9 +66,41 @@ def mock_file_reader(file_path: str) -> str:
     return f"Content of {file_path}: Mock file data"
 
 
+@tool
+def write_file(file_path: str, content: str) -> str:
+    """Write content to file.
+
+    Args:
+        file_path: Path to write to
+        content: Content to write
+
+    Returns:
+        Success message
+    """
+    path = Path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding='utf-8')
+    return f"File written: {file_path}"
+
+
+@tool
+def read_file(file_path: str) -> str:
+    """Read file content.
+
+    Args:
+        file_path: Path to read from
+
+    Returns:
+        File content
+    """
+    return Path(file_path).read_text(encoding='utf-8')
+
+
 def create_default_registry() -> ToolRegistry:
     """Create registry with default tools."""
     registry = ToolRegistry()
     registry.register("mock_test_runner", mock_test_runner)
     registry.register("mock_file_reader", mock_file_reader)
+    registry.register("write_file", write_file)
+    registry.register("read_file", read_file)
     return registry
