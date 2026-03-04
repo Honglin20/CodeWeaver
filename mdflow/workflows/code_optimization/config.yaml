@@ -1,0 +1,13 @@
+workflow:
+  name: code_optimization
+  timeout: 300
+  max_retries: 3
+
+llm:
+  default_model: deepseek-chat
+  temperature: 0.7
+  max_tokens: 2000
+
+memory:
+  short_term_window: 10
+  medium_term_retention_days: 30
