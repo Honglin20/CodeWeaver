@@ -22,7 +22,6 @@ end_point: done
 
 ## Edges
 
-validate --> interact : [failed]
 validate --> done : [passed]
-interact --> optimize
-optimize --> validate
+validate --> interact : [failed]
+interact --> done
