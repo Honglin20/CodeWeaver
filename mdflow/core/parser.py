@@ -1,7 +1,7 @@
 """Markdown parser for agent and workflow configurations."""
 import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 import frontmatter
 
 from .models import AgentConfig, WorkflowConfig, WorkflowNode, WorkflowEdge
@@ -124,7 +124,7 @@ def parse_workflow_file(file_path: str) -> WorkflowConfig:
         raise ParserConfigurationError(f"Failed to parse workflow file {file_path}: {str(e)}")
 
 
-def _parse_nodes(content: str) -> list[WorkflowNode]:
+def _parse_nodes(content: str) -> List[WorkflowNode]:
     """Parse node definitions from markdown content."""
     nodes = []
     # Match: ### Node: node_name (agent: agent_name)
@@ -144,7 +144,7 @@ def _parse_nodes(content: str) -> list[WorkflowNode]:
     return nodes
 
 
-def _parse_edges(content: str) -> list[WorkflowEdge]:
+def _parse_edges(content: str) -> List[WorkflowEdge]:
     """Parse edge definitions from markdown content."""
     edges = []
     # Match: A --> B : [condition] or A --> B
